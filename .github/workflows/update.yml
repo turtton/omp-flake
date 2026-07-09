@@ -1,0 +1,55 @@
+name: Auto-update
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Run update script
+        run: bash update.sh
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build
+        if: steps.changes.outputs.changed == 'true'
+        run: nix build .#omp
+
+      - name: Verify version
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          VERSION=$(jq -r '.version' hashes.json)
+          RESULT=$(./result/bin/omp --version 2>&1 || true)
+          echo "Expected: $VERSION"
+          echo "Got: $RESULT"
+
+      - name: Create PR
+        if: steps.changes.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update omp to $(jq -r '.version' hashes.json)"
+          title: "chore: update omp to $(jq -r '.version' hashes.json)"
+          body: |
+            Auto-detected new version of oh-my-pi.
+
+            - **Version**: $(jq -r '.version' hashes.json)
+            - **Source**: [can1357/oh-my-pi/releases](https://github.com/can1357/oh-my-pi/releases)
+
+            Built and verified successfully.
+          branch: auto-update
+          delete-branch: true
