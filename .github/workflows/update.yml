@@ -4,6 +4,10 @@ on:
     - cron: "0 6 * * *"
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -25,6 +29,11 @@ jobs:
             echo "changed=true" >> $GITHUB_OUTPUT
           fi
 
+      - name: Extract version
+        id: version
+        if: steps.changes.outputs.changed == 'true'
+        run: echo "version=$(jq -r '.version' hashes.json)" >> $GITHUB_OUTPUT
+
       - name: Build
         if: steps.changes.outputs.changed == 'true'
         run: nix build .#omp
@@ -32,22 +41,26 @@ jobs:
       - name: Verify version
         if: steps.changes.outputs.changed == 'true'
         run: |
-          VERSION=$(jq -r '.version' hashes.json)
-          RESULT=$(./result/bin/omp --version 2>&1 || true)
+          VERSION="${{ steps.version.outputs.version }}"
+          RESULT=$(./result/bin/omp --version 2>&1)
           echo "Expected: $VERSION"
           echo "Got: $RESULT"
+          test "$RESULT" = "omp/$VERSION" || {
+            echo "Version mismatch!"
+            exit 1
+          }
 
       - name: Create PR
         if: steps.changes.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update omp to $(jq -r '.version' hashes.json)"
-          title: "chore: update omp to $(jq -r '.version' hashes.json)"
+          commit-message: "chore: update omp to ${{ steps.version.outputs.version }}"
+          title: "chore: update omp to ${{ steps.version.outputs.version }}"
           body: |
             Auto-detected new version of oh-my-pi.
 
-            - **Version**: $(jq -r '.version' hashes.json)
+            - **Version**: ${{ steps.version.outputs.version }}
             - **Source**: [can1357/oh-my-pi/releases](https://github.com/can1357/oh-my-pi/releases)
 
             Built and verified successfully.

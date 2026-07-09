@@ -8,14 +8,22 @@ command -v curl >/dev/null 2>&1 || { echo "curl is required"; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo "jq is required"; exit 1; }
 command -v nix >/dev/null 2>&1 || { echo "nix is required"; exit 1; }
 
-echo "Fetching latest release from $REPO..."
+FORCE=false
+for arg in "$@"; do
+  if [ "$arg" = "--force" ]; then
+    FORCE=true
+  fi
+done
 
-declare -A ASSET_NAMES=(
-  ["x86_64-linux"]="omp-linux-x64"
-  ["aarch64-linux"]="omp-linux-arm64"
-  ["x86_64-darwin"]="omp-darwin-x64"
-  ["aarch64-darwin"]="omp-darwin-arm64"
+# Order-deterministic list of (system assetName) pairs
+SYSTEMS=(
+  "x86_64-linux:omp-linux-x64"
+  "aarch64-linux:omp-linux-arm64"
+  "x86_64-darwin:omp-darwin-x64"
+  "aarch64-darwin:omp-darwin-arm64"
 )
+
+echo "Fetching latest release from $REPO..."
 
 RELEASE_JSON=$(curl -fsSL --connect-timeout 10 --max-time 30 \
   "https://api.github.com/repos/${REPO}/releases/latest")
@@ -31,17 +39,22 @@ fi
 echo "Latest version: $VERSION (tag: $TAG_NAME)"
 
 CURRENT_VERSION=$(jq -r '.version // "0"' "$HASHES_FILE")
-if [ "$VERSION" = "$CURRENT_VERSION" ]; then
-  echo "Version $VERSION is already current. No update needed."
+if [ "$VERSION" = "$CURRENT_VERSION" ] && [ "$FORCE" = false ]; then
+  echo "Version $VERSION is already current. Use --force to refresh hashes."
   exit 0
 fi
 
-echo "Updating from $CURRENT_VERSION to $VERSION..."
+if [ "$FORCE" = true ]; then
+  echo "Force-refreshing hashes for version $VERSION..."
+else
+  echo "Updating from $CURRENT_VERSION to $VERSION..."
+fi
 
 SOURCES_JSON="{"
 FIRST=true
-for SYSTEM in "${!ASSET_NAMES[@]}"; do
-  ASSET_NAME="${ASSET_NAMES[$SYSTEM]}"
+for ENTRY in "${SYSTEMS[@]}"; do
+  SYSTEM="${ENTRY%%:*}"
+  ASSET_NAME="${ENTRY#*:}"
   URL="https://github.com/${REPO}/releases/download/${TAG_NAME}/${ASSET_NAME}"
 
   echo "  Hashing $SYSTEM ($ASSET_NAME)..."
@@ -52,6 +65,9 @@ for SYSTEM in "${!ASSET_NAMES[@]}"; do
     exit 1
   fi
 
+  # Convert nix base32 hash to SRI format for consistency
+  SRI=$(nix hash convert --hash-algo sha256 --to sri "sha256:$HASH" 2>/dev/null)
+
   if [ "$FIRST" = true ]; then
     FIRST=false
   else
@@ -61,7 +77,7 @@ for SYSTEM in "${!ASSET_NAMES[@]}"; do
   SOURCES_JSON+="
     \"${SYSTEM}\": {
       \"url\": \"${URL}\",
-      \"hash\": \"${HASH}\"
+      \"hash\": \"${SRI}\"
     }"
 done
 SOURCES_JSON+="

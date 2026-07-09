@@ -1,8 +1,9 @@
 {
   lib,
   stdenvNoCC,
+  stdenv,
   fetchurl,
-  autoPatchelfHook,
+  writeShellScript,
 }:
 
 let
@@ -17,8 +18,17 @@ let
   src = fetchurl {
     url = srcInfo.url;
     hash = srcInfo.hash;
-    executable = true;
   };
+
+  # Bun-compiled binaries hardcode /lib64/ld-linux-x86-64.so.2 which does
+  # not exist on NixOS.  We cannot use autoPatchelfHook because patchelf
+  # corrupts the embedded Bun payload.  Instead we leave the binary
+  # untouched in libexec/ and wrap it via Nix's dynamic linker.
+  linuxWrapper = writeShellScript "omp-wrapper" ''
+    exec ${stdenv.cc.bintools.dynamicLinker} \
+      --library-path ${lib.makeLibraryPath [ stdenv.cc.libc ]} \
+      "$(dirname "$0")/../libexec/omp" "$@"
+  '';
 
 in
 stdenvNoCC.mkDerivation {
@@ -30,15 +40,22 @@ stdenvNoCC.mkDerivation {
   dontBuild = true;
   dontFixup = true;
 
-  nativeBuildInputs = lib.optionals stdenvNoCC.hostPlatform.isLinux [ autoPatchelfHook ];
-
   installPhase = ''
     runHook preInstall
 
-    install -Dm755 ${src} $out/bin/omp
-
-    # omp alias for compatibility with the upstream binary name.
-    ln -s $out/bin/omp $out/bin/omp
+    install -Dm755 ${src} $out/libexec/omp
+    install -d $out/bin
+    ${
+      if stdenvNoCC.hostPlatform.isLinux then
+        ''
+          install -Dm755 ${linuxWrapper} $out/bin/omp
+        ''
+      else
+        ''
+          ln -s $out/libexec/omp $out/bin/omp
+        ''
+    }
+    ln -s omp $out/bin/pi
 
     runHook postInstall
   '';
