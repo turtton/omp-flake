@@ -10,6 +10,7 @@ Nix flake for [oh-my-pi](https://github.com/can1357/oh-my-pi) (omp). Downloads p
 | `package.nix` | Derivation — fetches from URL in `hashes.json`, no build step |
 | `hashes.json` | Version + per-system URL+SRI-hash map |
 | `update.sh` | Fetches latest release from GitHub API, re-hashes, writes `hashes.json` |
+| `.github/workflows/ci.yml` | PR/push CI: `nix build .#omp` — triggered on `pull_request` and `push` to `main` |
 | `.github/workflows/update.yml` | Daily cron: `update.sh` → build → version check → PR |
 
 ## Key commands
@@ -47,6 +48,28 @@ Version verification assertion in CI:
 ```bash
 test "$(./result/bin/omp --version)" = "omp/$VERSION"
 ```
+
+## CI
+
+`.github/workflows/ci.yml` runs `nix build .#omp` on every PR targeting `main` and every push to `main`. It verifies that the derivation builds and the binary runs.
+
+## Auto-update PR and CI
+
+The auto-update workflow creates PRs on the `auto-update` branch. For CI to run automatically on those PRs (via the `pull_request` trigger in `ci.yml`), a **GitHub Personal Access Token (PAT)** must be configured:
+
+1. Create a fine-grained PAT at https://github.com/settings/tokens with:
+   - Repository access: `turtton/omp-flake` only
+   - Permissions: **Contents** (Read and write), **Pull requests** (Read and write)
+2. Add it as a repository secret: **Settings → Secrets and variables → Actions → New repository secret**
+   - Name: `PAT_TOKEN`
+   - Value: the PAT you created
+
+Without `PAT_TOKEN`, the workflow falls back to `GITHUB_TOKEN`. PRs are still created, but CI runs must be approved manually on the PR page ("Approve and run").
+
+**Important**: If `PAT_TOKEN` is set but expired or revoked, the expression `${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}` evaluates the expired token as truthy (non-empty string), so the fallback to `GITHUB_TOKEN` does **not** activate. The `create-pull-request` step will fail with an authentication error. To recover:
+- Renew the PAT at https://github.com/settings/tokens
+- Update the repository secret with the new token
+- Alternatively, delete the `PAT_TOKEN` secret to revert to `GITHUB_TOKEN` behavior
 
 ## No tests
 

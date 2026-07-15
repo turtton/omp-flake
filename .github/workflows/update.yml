@@ -12,10 +12,10 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: DeterminateSystems/nix-installer-action@a7ad9c4f0c65208097f4d34f3cfa1913b80cce5c # main
+      - uses: DeterminateSystems/magic-nix-cache-action@76aaf8814cdb385b86597c32b8c51b66b69b0839 # main
 
       - name: Run update script
         run: bash update.sh
@@ -24,15 +24,15 @@ jobs:
         id: changes
         run: |
           if [ -z "$(git status --porcelain)" ]; then
-            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           else
-            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Extract version
         id: version
         if: steps.changes.outputs.changed == 'true'
-        run: echo "version=$(jq -r '.version' hashes.json)" >> $GITHUB_OUTPUT
+        run: echo "version=$(jq -r '.version' hashes.json)" >> "$GITHUB_OUTPUT"
 
       - name: Build
         if: steps.changes.outputs.changed == 'true'
@@ -52,9 +52,11 @@ jobs:
 
       - name: Create PR
         if: steps.changes.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676  # v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # PAT_TOKEN 使用時は CI (pull_request) が自動トリガーされる
+          # 未設定時は GITHUB_TOKEN にフォールバック（手動承認が必要）
+          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           commit-message: "chore: update omp to ${{ steps.version.outputs.version }}"
           title: "chore: update omp to ${{ steps.version.outputs.version }}"
           body: |

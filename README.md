@@ -46,9 +46,13 @@ nix profile install github:turtton/omp-flake
 Binary exposed:
 - `omp` — the oh-my-pi coding agent CLI
 
+## Continuous Integration
+
+`.github/workflows/ci.yml` runs `nix build .#omp` and verifies the binary version on every pull request targeting `main` and every push to `main`.
+
 ## Auto-update
 
-`.github/workflows/update.yml` runs on a daily cron. When it detects a new version on GitHub releases, it updates `hashes.json`, builds the package, and opens a pull request.
+`.github/workflows/update.yml` runs on a daily cron. When it detects a new version on GitHub releases, it updates `hashes.json`, builds the package, and opens a pull request on the `auto-update` branch.
 
 To run the update locally:
 
@@ -58,6 +62,21 @@ nix build .#omp
 ```
 
 Required tools: `curl`, `jq`, `nix`.
+
+### Enabling CI on auto-update PRs
+
+By default, the auto-update workflow uses `GITHUB_TOKEN` to create PRs, which creates a CI run that requires manual approval on the PR page. To have CI run automatically without manual approval, configure a **Personal Access Token (PAT)**:
+
+1. Create a [fine-grained PAT](https://github.com/settings/tokens) with:
+   - Repository access: `turtton/omp-flake` only
+   - Permissions: **Contents** (Read and write), **Pull requests** (Read and write)
+2. Add it as a repository secret: **Settings → Secrets and variables → Actions → New repository secret**
+   - Name: `PAT_TOKEN`
+   - Value: the PAT you created
+
+Once `PAT_TOKEN` is set, CI will run automatically on every auto-update PR.
+
+**Important**: If `PAT_TOKEN` is set but expired or revoked, the expression `${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}` evaluates the expired token as truthy (non-empty string), so the fallback to `GITHUB_TOKEN` does **not** activate. The `create-pull-request` step fails with an authentication error, and no PR is created. To recover: renew the PAT, or delete the `PAT_TOKEN` secret to revert to `GITHUB_TOKEN` behavior.
 
 ## License
 

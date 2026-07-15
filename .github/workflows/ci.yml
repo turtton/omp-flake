@@ -1,0 +1,32 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: DeterminateSystems/nix-installer-action@a7ad9c4f0c65208097f4d34f3cfa1913b80cce5c # main
+      - uses: DeterminateSystems/magic-nix-cache-action@76aaf8814cdb385b86597c32b8c51b66b69b0839 # main
+
+      - name: Build
+        run: nix build .#omp
+
+      - name: Verify binary version matches hashes.json
+        run: |
+          VERSION="$(jq -r '.version' hashes.json)"
+          RESULT=$(./result/bin/omp --version 2>&1)
+          echo "Expected: $VERSION"
+          echo "Got: $RESULT"
+          test "$RESULT" = "omp/$VERSION" || {
+            echo "Version mismatch!"
+            exit 1
+          }

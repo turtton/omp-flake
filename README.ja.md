@@ -46,9 +46,13 @@ nix profile install github:turtton/omp-flake
 公開されるバイナリ:
 - `omp` — oh-my-pi コーディングエージェントCLI
 
+## 継続的インテグレーション (CI)
+
+`.github/workflows/ci.yml` が `main` ブランチへのプルリクエストとプッシュ時に `nix build .#omp` を実行し、バイナリのバージョンを検証します。
+
 ## 自動更新
 
-`.github/workflows/update.yml` が日次cronで実行されます。GitHubリリースで新しいバージョンを検出すると、`hashes.json` を更新し、ビルドし、プルリクエストを作成します。
+`.github/workflows/update.yml` が日次cronで実行されます。GitHubリリースで新しいバージョンを検出すると、`hashes.json` を更新し、ビルドし、`auto-update` ブランチにプルリクエストを作成します。
 
 ローカルで更新を実行する場合:
 
@@ -58,6 +62,21 @@ nix build .#omp
 ```
 
 必要なツール: `curl`, `jq`, `nix`
+
+### 自動更新PRでCIを実行するには
+
+デフォルトでは、自動更新ワークフローは `GITHUB_TOKEN` を使用してPRを作成するため、CIの実行にはPRページでの手動承認が必要になります。自動更新PRでCIを自動実行するには、**Personal Access Token (PAT)** を設定してください。
+
+1. [fine-grained PAT](https://github.com/settings/tokens) を作成:
+   - リポジトリアクセス: `turtton/omp-flake` のみ
+   - 権限: **Contents** (読み取り・書き込み), **Pull requests** (読み取り・書き込み)
+2. リポジトリシークレットとして追加: **Settings → Secrets and variables → Actions → New repository secret**
+   - 名前: `PAT_TOKEN`
+   - 値: 作成したPAT
+
+`PAT_TOKEN` を設定すると、自動更新PRでCIが自動実行されます。
+
+**注意**: `PAT_TOKEN` が設定済みだが有効期限切れまたは失効している場合、`${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}` は期限切れトークンを真（空でない文字列）と評価するため、`GITHUB_TOKEN` へのフォールバックは**行われません**。`create-pull-request` ステップが認証エラーで失敗し、PRも作成されません。回復するには: PATを更新するか、`PAT_TOKEN` シークレットを削除して `GITHUB_TOKEN` の動作に戻してください。
 
 ## ライセンス
 
