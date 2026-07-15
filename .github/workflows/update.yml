@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
 
       - uses: DeterminateSystems/nix-installer-action@a7ad9c4f0c65208097f4d34f3cfa1913b80cce5c # main
       - uses: DeterminateSystems/magic-nix-cache-action@76aaf8814cdb385b86597c32b8c51b66b69b0839 # main
@@ -41,7 +43,7 @@ jobs:
       - name: Verify version
         if: steps.changes.outputs.changed == 'true'
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
+          VERSION="$(jq -r '.version' hashes.json)"
           RESULT=$(./result/bin/omp --version 2>&1)
           echo "Expected: $VERSION"
           echo "Got: $RESULT"
