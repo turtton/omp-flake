@@ -11,7 +11,7 @@ Nix flake for [oh-my-pi](https://github.com/can1357/oh-my-pi) (omp). Downloads p
 | `hashes.json` | Version + per-system URL+SRI-hash map |
 | `update.sh` | Fetches latest release from GitHub API, re-hashes, writes `hashes.json` |
 | `.github/workflows/ci.yml` | PR/push CI: `nix build .#omp` — triggered on `pull_request` and `push` to `main` |
-| `.github/workflows/update.yml` | Daily cron: `update.sh` → build → version check → PR |
+| `.github/workflows/update.yml` | Daily cron: `update.sh` → build → PR |
 
 ## Key commands
 
@@ -42,12 +42,7 @@ nix build .#omp
 
 ## Updating
 
-The CI workflow (`.github/workflows/update.yml`) runs daily at 06:00 UTC and can be triggered manually via workflow_dispatch. It runs `update.sh`, builds, verifies `./result/bin/omp --version` matches the version in `hashes.json`, and opens a PR on `auto-update` branch.
-
-Version verification assertion in CI:
-```bash
-test "$(./result/bin/omp --version)" = "omp/$VERSION"
-```
+The auto-update workflow (`.github/workflows/update.yml`) runs daily at 06:00 UTC and can be triggered manually via workflow_dispatch. It runs `update.sh`, builds the derivation, and opens a PR on `auto-update` branch. Binary version verification is handled by `.github/workflows/ci.yml` (read-only `pull_request` workflow).
 
 ## CI
 
