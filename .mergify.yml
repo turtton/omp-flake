@@ -1,0 +1,13 @@
+pull_request_rules:
+  - name: New rule
+    conditions:
+      - base = main
+    actions: {}
+  - name: Auto-merge approved PRs
+    conditions:
+      - base = main
+      - check-success = build
+      - author = turtton
+    actions:
+      merge:
+        method: squash
