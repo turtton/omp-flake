@@ -29,6 +29,10 @@
         }
       );
 
+      checks = forAllSystems (system: {
+        default = self.packages.${system}.default;
+      });
+
       overlays.default = final: _prev: {
         omp = final.callPackage ./package.nix { };
       };
