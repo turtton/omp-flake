@@ -1,13 +1,14 @@
+queue_rules:
+  - name: default
+    conditions:
+      - check-success="CI / build"
+
 pull_request_rules:
-  - name: New rule
+  - name: auto-merge auto-update PRs
     conditions:
-      - base = main
-    actions: {}
-  - name: Auto-merge approved PRs
-    conditions:
-      - base = main
-      - check-success = build
-      - author = turtton
+      - head=auto-update
+      - author=turtton
     actions:
-      merge:
+      queue:
+        name: default
         method: squash
